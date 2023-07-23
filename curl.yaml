@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: default
+  name: pod-lister
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: default
+  name: pod-lister
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pod-lister-binding
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: pod-lister
+  namespace: default
+roleRef:
+  kind: Role
+  name: pod-lister
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: curl-list-pod-job
+  namespace: default
+spec:
+  template:
+    spec:
+      serviceAccountName: pod-lister
+      restartPolicy: Never
+      containers:
+      - name: curl
+        image: curlimages/curl
+        command:
+        - sh
+        - -c
+        - >
+          TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token);
+          curl --insecure -H "Authorization: Bearer $TOKEN" https://kubernetes/api/v1/namespaces/default/pods
